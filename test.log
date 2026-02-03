@@ -1,0 +1,950 @@
+-------------------------------------test version 2.0----------------------------------
+#include "sparse_matrix.h"
+#include "PoissonEQ.h"
+#include <numeric>
+#include <chrono>
+
+int main() {
+    try {
+        // 创建一个3x3的稀疏矩阵A
+        SparseMatrix A(3, 3);
+        A.setValue(0, 0, 1.0);
+        A.setValue(0, 2, 2.0);
+        A.setValue(1, 1, 3.0);
+        A.setValue(2, 2, 5.0);
+        A.setValue(2, 0, 4.0);
+
+        std::cout << "Matrix A(Concentrate):" << std::endl;
+        A.printDense();
+        std::cout << std::endl;
+
+        std::cout << "Matrix A(Sparse):" << std::endl;
+        A.printSparse();
+        std::cout << std::endl;
+
+        A.rowMultiply(1, 2.0);
+        std::cout << "Matrix A(2*row1)(Concentrate):" << std::endl;
+        A.printDense();
+        std::cout << std::endl;
+
+        A.rowMultiAdd(1, 2.0, 2);
+        std::cout << "Matrix A(add row2(2*row1))(Concentrate):" << std::endl;
+        A.printDense();
+        std::cout << std::endl;
+
+        // 创建另一个3x3的稀疏矩阵B
+        SparseMatrix B(3, 3);
+        B.setValue(0, 0, 5.0);
+        B.setValue(0, 1, 6.0);
+        B.setValue(1, 1, 7.0);
+        B.setValue(1, 2, 8.0);
+        B.setValue(2, 0, 9.0);
+
+        std::cout << "Matrix B(Dense):" << std::endl;
+        B.printDense();
+        std::cout << std::endl;
+
+        // 测试矩阵加法
+        SparseMatrix C = A.add(B);
+        std::cout << "Matrix A+B(Dense):" << std::endl;
+        C.printDense();
+        std::cout << std::endl;
+
+        // 测试矩阵乘法
+        SparseMatrix D = A.multiply(B);
+        std::cout << "Matrix A*B(Dense):" << std::endl;
+        D.printDense();
+        std::cout << std::endl;
+
+        // 测试矩阵转置
+        SparseMatrix A_T = A.transpose();
+        std::cout << "Transpose A(Dense):" << std::endl;
+        A_T.printDense();
+        std::cout << std::endl;
+
+        std::cout << "Transpose A(Sparse):" << std::endl;
+        A_T.printSparse();
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
+    }
+
+    // 测试线性方程组求解
+    std::cout << "Testing linear solvers..." << std::endl;
+
+    SparseMatrix A(6, 6);
+    A.setValue(0, 0, 4.0);
+    A.setValue(0, 1, 1.0);
+    A.setValue(1, 0, 1.0);
+    A.setValue(1, 1, 5.0);
+    A.setValue(1, 2, 2.0);
+    A.setValue(2, 1, 2.0);
+    A.setValue(2, 2, 6.0);
+    A.setValue(3, 2, 4.0);
+    A.setValue(3, 3, 8.0);
+    A.setValue(2, 3, 4.0);
+    A.setValue(3, 4, 5.0);
+    A.setValue(4, 3, 5.0);
+    A.setValue(4, 4, 9.0);
+    A.setValue(4, 5, 2.0);
+    A.setValue(5, 4, 2.0);
+    A.setValue(5, 5, 7.0);
+    std::cout << "Matrix A(Dense):" << std::endl;
+    A.printDense();
+    std::cout << std::endl;
+
+    // 右侧向量b
+    std::vector<double> b = {12.0, 20.0, 30.0, 60.0, 20.0, 30.0};
+
+
+    // Gauss-Seidel求解
+    auto(x_gs) = A.gaussSeidel(b);
+    std::cout << "Gauss-Seidel finished." << std::endl;
+    std::cout << "Gauss-Seidel iter: " << x_gs.iteration << std::endl;
+    std::cout << "Gauss-Seidel residual: " << x_gs.residual << std::endl;
+    std::cout << "Gauss-Seidel solution: ";
+    for (double val : x_gs.solution) std::cout << val << " ";
+    std::cout << std::endl;
+
+    // 共轭梯度法求解
+    auto(x_cg) = A.conjugateGradient(b, 1e-3, 1e7);
+    std::cout << "Conjugate gradient converged in " << x_cg.iteration + 1
+                      << " iterations. Residual: " << x_cg.residual << std::endl;
+    std::cout << "Conjugate Gradient solution: ";
+    for (double val : x_cg.solution) std::cout << val << " ";
+    std::cout << std::endl;
+
+    // 测试大稀疏矩阵
+    std::cout << std::endl;
+    int scale = 100000;
+    std::cout << "Huge Sparse Matrix, Scale:" << scale << "."<< std::endl <<
+        "Now Testing..." << std::endl;
+    SparseMatrix J(scale, scale);
+    std::vector<double> j(scale,0);
+    std::vector<double> value_l(scale*3,0);
+    std::vector<int> col_l(scale*3,0);
+    std::vector<int> row_l(scale+1,0);
+    for (int row = 0; row < scale; row++) {
+        if (row < 1) {
+            value_l[row] = 4.0;
+            value_l[row+1] = 1.0;
+            value_l[row+2] = 1.0;
+            col_l[row] = 0;
+            col_l[row+1] = 1;
+            col_l[row+2] = scale-1;
+        }
+        else if (row >scale-2) {
+            value_l[3*row] = 1.0;
+            col_l[3*row] = 0;
+            value_l[3*row+1] = 1.0;
+            col_l[3*row+1] = row-1;
+            value_l[3*row+2] = 6.0;
+            col_l[3*row+2] = row;
+        }
+        else {
+            value_l[3*row+2] = row%3;
+            col_l[3*row+2] = row+1;
+            value_l[3*row] = row%3;
+            col_l[3*row] = row-1;
+            value_l[3*row+1] = 5.0+(row%4);
+            col_l[3*row+1] = row;
+        }
+        row_l[row] = 3*row;
+        j[row] = 10*(row%5);
+    }
+    row_l[scale] = scale*3;
+    J.setMatrix(value_l, col_l, row_l);
+    std::cout << "Now Starting chrono" << std::endl;
+    auto start_time = std::chrono::high_resolution_clock::now();
+    std::cout << "Now transposing..." << std::endl;
+    SparseMatrix J_T(scale, scale);
+    J_T = J.transpose();
+
+    std::cout << "Start..." << std::endl;
+    // Gauss-Seidel求解
+    auto(x_hs_gs) = J.gaussSeidel(j);
+    std::cout << "Gauss-Seidel finished." << std::endl;
+    std::cout << "Gauss-Seidel iter: " << x_hs_gs.iteration << std::endl;
+    std::cout << "Gauss-Seidel residual: " << x_hs_gs.residual << std::endl;
+    std::cout << "First Solution: " << x_hs_gs.solution[0] << std::endl;
+    // std::cout << "Gauss-Seidel solution: ";
+    // for (double val : x_hs_gs.solution) std::cout << val << " ";
+    std::cout << std::endl;
+    // 3. 获取结束时间点
+    auto end_time = std::chrono::high_resolution_clock::now();
+
+    // 4. 计算时间差 (duration)
+    //    duration_cast 用于将时间差转换为指定的单位
+    auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+    auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+    auto duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time);
+
+    // 5. 输出结果
+    std::cout << "Execution time:\n";
+    std::cout << "  - " << duration_ms.count() << " milliseconds\n";
+    std::cout << "  - " << duration_us.count() << " microseconds\n";
+    std::cout << "  - " << duration_ns.count() << " nanoseconds\n";
+
+    // 共轭梯度法求解
+    //auto(x_hs_cg) = J.conjugateGradient(j, 1e-5, 1e7);
+    //std::cout << "Conjugate Gradient finished." << std::endl;
+    //std::cout << "Conjugate Gradient iter: " << x_hs_cg.iteration << std::endl;
+    //std::cout << "Conjugate Gradient residual: " << x_hs_cg.residual << std::endl;
+    //std::cout << "Conjugate Gradient solution: ";
+    //std::cout << "First Solution: " << x_hs_cg.solution[0] << std::endl;
+    // for (double val : x_hs_cg.solution) std::cout << val << " ";
+    // std::cout << std::endl;
+        // 测试上下三角和对角线提取
+    SparseMatrix D(3, 3);
+    D.setValue(0, 0, 1.0);
+    D.setValue(0, 1, 2.0);
+    D.setValue(0, 2, 3.0);
+    D.setValue(1, 0, 4.0);
+    D.setValue(1, 1, 5.0);
+    D.setValue(1, 2, 6.0);
+    D.setValue(2, 0, 7.0);
+    D.setValue(2, 1, 8.0);
+    D.setValue(2, 2, 9.0);
+
+    std::cout << "Origin Matrix" << std::endl;
+    D.printDense();
+
+    std::cout << "Diagonal Part" << std::endl;
+    D.diagonal().printDense();
+
+    std::cout << "Upper triangle Part" << std::endl;
+    D.upperTriangle().printDense();
+
+    std::cout << "Down triangle Part" << std::endl;
+    D.lowerTriangle().printDense();
+
+
+    std::vector<PolygonEdge> edges = {
+        {PolygonPoint(0,0), PolygonPoint(2,0), POLY_DIRICHLET, [](double x, double y){return 1.0;}},
+        {PolygonPoint(2,0), PolygonPoint(1,1), POLY_DIRICHLET, [](double x, double y){return 2.0;}},
+        {PolygonPoint(1,1), PolygonPoint(2,3), POLY_DIRICHLET, [](double x, double y){return 3.0;}},
+        {PolygonPoint(2,3), PolygonPoint(1,4), POLY_DIRICHLET, [](double x, double y){return 4.0;}},
+        {PolygonPoint(1,4), PolygonPoint(0,3), POLY_DIRICHLET, [](double x, double y){return 5.0;}},
+        {PolygonPoint(0,3), PolygonPoint(0,0), POLY_DIRICHLET, [](double x, double y){return 0.0;}}
+    };
+    PolygonRegion region(edges);
+    PolyPoissonEQ poly(101, 201, 0.02, 0.02, region, 3.1e-2);
+    poly.makeMatrix();
+    poly.makeConstant([](double x, double y){return x*y;});
+    auto x_PDE = poly.SolvePDE(1e-6, 30000);
+    std::cout << "Gauss-Seidel finished." << std::endl;
+    std::cout << "Gauss-Seidel iter: " << x_PDE.iteration << std::endl;
+    std::cout << "Gauss-Seidel residual: " << x_PDE.residual << std::endl;
+    write_vector_to_file("vector_data.bin",x_PDE.solution);
+
+    return 0;
+}
+
+
+-------------------------------------test version 2.3----------------------------------
+#include "sparse_matrix.h"
+#include "PoissonEQ.h"
+#include <numeric>
+#include <chrono>
+#include <cmath>
+#include "ParabolaPDE.h"
+
+
+double testDirichletBC(double x, double y){
+    return std::sin(std::numbers::pi* x)*std::cos(2*std::numbers::pi*y);
+}
+
+double testNeumannBC_X(double x, double y){
+    return std::numbers::pi*std::cos(std::numbers::pi* x)*std::cos(2*std::numbers::pi*y);
+}
+
+double testNeumannBC_Y(double x, double y){
+    return -2*std::numbers::pi*std::sin(std::numbers::pi* x)*std::sin(2*std::numbers::pi*y);
+}
+
+double testSource(double x, double y){
+    return -5*std::numbers::pi*std::numbers::pi*testDirichletBC(x, y);
+}
+
+double testSource2(double x, double y){
+    return -2*std::numbers::pi*std::numbers::pi*testDirichletBC(x, y);
+}
+
+int main() {
+
+    std::vector<PolygonEdge> edges = {
+        {PolygonPoint(0,0), PolygonPoint(2,0), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(2,0), PolygonPoint(1,1), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(1,1), PolygonPoint(2,3), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(2,3), PolygonPoint(1,4), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(1,4), PolygonPoint(0,3), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(0,3), PolygonPoint(0,0), POLY_DIRICHLET, testDirichletBC}
+    };
+    PolygonRegion region(edges);
+    PolyPoissonEQ poly(101, 201, 0.02, 0.02, region, 3.1e-2);
+
+    std::cout << "Dirichlet Boundary Condition Test" << std::endl;
+    std::cout << "Now Starting chrono" << std::endl;
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Make PDEMatrix..." << std::endl;
+    poly.makeMatrix();
+    auto matrix_time = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Make Constant..." << std::endl;
+    poly.makeConstant(testSource);
+    auto constant_time = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Now Solving..." << std::endl;
+    auto x_PDE = poly.SolvePDE(1e-5, 30000);
+    auto end_time = std::chrono::high_resolution_clock::now();
+
+    auto duration_matrix = std::chrono::duration_cast<std::chrono::milliseconds>(matrix_time - start_time);
+    auto duration_constant = std::chrono::duration_cast<std::chrono::milliseconds>(constant_time - matrix_time);
+    auto duration_solve = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - constant_time);
+
+    std::cout << "Execution time:\n";
+    std::cout << "Make PDEMatrix:\n";
+    std::cout << "  - " << duration_matrix.count() << " milliseconds\n";
+    std::cout << "Make Constant:\n";
+    std::cout << "  - " << duration_constant.count() << " milliseconds\n";
+    std::cout << "Make Solve:\n";
+    std::cout << "  - " << duration_solve.count() << " milliseconds\n";
+    std::cout << "Gauss-Seidel finished." << std::endl;
+    std::cout << "Gauss-Seidel iter: " << x_PDE.iteration << std::endl;
+    std::cout << "Gauss-Seidel residual: " << x_PDE.residual << std::endl;
+    write_vector_to_file("vector_data1.bin",x_PDE.solution);
+    std::cout << std::endl;
+
+    std::vector<PolygonEdge> edges2 = {
+        {PolygonPoint(0,0), PolygonPoint(2,0), POLY_NEUMANN, [](double x, double y){return testNeumannBC_Y(x, y);}},
+        {PolygonPoint(2,0), PolygonPoint(1,1), POLY_NEUMANN, [](double x, double y){return -(testNeumannBC_X(x, y)+testNeumannBC_Y(x, y))/sqrt(2);}},
+        {PolygonPoint(1,1), PolygonPoint(2,3), POLY_NEUMANN, [](double x, double y){return (-2*testNeumannBC_X(x, y)+testNeumannBC_Y(x, y))/sqrt(5);}},
+        {PolygonPoint(2,3), PolygonPoint(1,4), POLY_NEUMANN, [](double x, double y){return -(testNeumannBC_X(x, y)+testNeumannBC_Y(x, y))/sqrt(2);}},
+        {PolygonPoint(1,4), PolygonPoint(0,3), POLY_NEUMANN, [](double x, double y){return (testNeumannBC_X(x, y)-testNeumannBC_Y(x, y))/sqrt(2);}},
+        {PolygonPoint(0,3), PolygonPoint(0,0), POLY_NEUMANN, [](double x, double y){return testNeumannBC_X(x, y);}}
+    };
+    PolygonRegion region2(edges2);
+    PolyPoissonEQ poly2(101, 201, 0.02, 0.02, region, 3.1e-2);
+
+    std::cout << "Neumann Boundary Condition Test" << std::endl;
+    std::cout << "Now Starting chrono" << std::endl;
+    auto start_time2 = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Make PDEMatrix..." << std::endl;
+    poly2.makeMatrix();
+    auto matrix_time2 = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Make Constant..." << std::endl;
+    poly2.makeConstant(testSource);
+    auto constant_time2 = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Now Solving..." << std::endl;
+    auto x_PDE2 = poly2.SolvePDE(1e-5, 30000);
+    auto end_time2 = std::chrono::high_resolution_clock::now();
+
+    auto duration_matrix2 = std::chrono::duration_cast<std::chrono::milliseconds>(matrix_time2 - start_time2);
+    auto duration_constant2 = std::chrono::duration_cast<std::chrono::milliseconds>(constant_time2 - matrix_time2);
+    auto duration_solve2 = std::chrono::duration_cast<std::chrono::milliseconds>(end_time2 - constant_time2);
+
+    std::cout << "Execution time:\n";
+    std::cout << "Make PDEMatrix:\n";
+    std::cout << "  - " << duration_matrix2.count() << " milliseconds\n";
+    std::cout << "Make Constant:\n";
+    std::cout << "  - " << duration_constant2.count() << " milliseconds\n";
+    std::cout << "Make Solve:\n";
+    std::cout << "  - " << duration_solve2.count() << " milliseconds\n";
+    std::cout << "Gauss-Seidel finished." << std::endl;
+    std::cout << "Gauss-Seidel iter: " << x_PDE2.iteration << std::endl;
+    std::cout << "Gauss-Seidel residual: " << x_PDE2.residual << std::endl;
+    write_vector_to_file("vector_data2.bin",x_PDE2.solution);
+
+    return 0;
+}
+
+
+
+-------------------v3.2----------------------------------
+#include "sparse_matrix.h"
+#include "PoissonEQ.h"
+#include <numeric>
+#include <chrono>
+#include <cmath>
+#include "ParabolaPDE.h"
+
+double delta(double x, double y, double x0, double y0, double tol) {
+    double delX = x-x0;
+    double delY = y-y0;
+    if (delX*delX + delY*delY < tol) {
+        return 1;
+    }else {
+        return 0;
+    }
+}
+
+// 初始条件：高斯分布
+double initCondition(double x, double y) {
+    return std::exp(-5.0 * ((x-1.0)*(x-1.0) + (y-2.0)*(y-2.0)));
+}
+
+// 源项：无热源（f=0）
+double sourceTerm(double x, double y, double t) {
+    return 100*delta(x, y, 1, 2.5, 0.03)*std::sin(50*t);
+}
+
+double testFunc(double x, double y, double t) {
+    return exp(x+y)*sin(t);
+}
+
+double testInitCondition(double x, double y) {
+    return 0;
+}
+
+double testSourceTerm(double x, double y, double t) {
+    return exp(x+y)*(cos(t)-2*sin(t));
+}
+
+int main() {
+    /*// 1. 定义计算区域（多边形边界）
+    std::vector<PolygonEdge> edges = {
+        {PolygonPoint(0,0), PolygonPoint(2,0), POLY_DIRICHLET, [](double x, double y){return 1.0;}},
+        {PolygonPoint(2,0), PolygonPoint(1,1), POLY_DIRICHLET, [](double x, double y){return 1.5;}},
+        {PolygonPoint(1,1), PolygonPoint(2,3), POLY_DIRICHLET, [](double x, double y){return 0.0;}},
+        {PolygonPoint(2,3), PolygonPoint(1,4), POLY_DIRICHLET, [](double x, double y){return 0.0;}},
+        {PolygonPoint(1,4), PolygonPoint(0,3), POLY_DIRICHLET, [](double x, double y){return 0.8;}},
+        {PolygonPoint(0,3), PolygonPoint(0,0), POLY_DIRICHLET, [](double x, double y){return 0.5;}}
+    };
+    PolygonRegion region(edges);
+
+    // 2. 数值参数（CN格式无条件稳定，dt可大幅增大）
+    int Nx = 101, Ny =201;         // 网格节点数
+    double hx = 2.0 / (Nx-1), hy = 4.0 / (Ny-1);  // 空间步长（x:0-2，y:0-4）
+    double alpha = -1.0;              // 扩散系数
+    double dt = 0.001;                // 时间步长（无需满足CFL条件）
+    int total_steps = 1000;           // 总时间步数（t总=1.0）
+    double boundary_tol = (hx+hy)*1.4;
+
+    PolyPoissonEQ poly(Nx, Ny, hx, hy, region, boundary_tol);
+    // 3. 初始化CN求解器
+    ParabolaCN cn_solver(poly, alpha, dt, total_steps);
+
+    // 4. 求解并计时
+    auto start = std::chrono::high_resolution_clock::now();
+    cn_solver.solve(initCondition, sourceTerm, "data/Hw3_Result");
+    auto end = std::chrono::high_resolution_clock::now();
+    double time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    std::cout << "CN finished!" << std::endl;
+    std::cout << "Total time:" << time << " ms" << std::endl;
+    std::cout << "File saved: data/Hw3_Result" << std::endl;*/
+
+    /*// 1. 定义计算区域（多边形边界）
+    std::vector<PolygonEdge> edgesTest = {
+        {PolygonPoint(0,0), PolygonPoint(2,0), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(2,0), PolygonPoint(1,1), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(1,1), PolygonPoint(2,3), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(2,3), PolygonPoint(1,4), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(1,4), PolygonPoint(0,3), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(0,3), PolygonPoint(0,0), POLY_DIRICHLET, testFunc}
+    };
+    PolygonRegion regionTest(edgesTest);
+
+    // 2. 数值参数（CN格式无条件稳定，dt可大幅增大）
+    int NxTest = 201, NyTest =401;         // 网格节点数
+    double hxTest = 2.0 / (NxTest-1), hyTest = 4.0 / (NyTest-1);  // 空间步长（x:0-2，y:0-4）
+    double alphaTest = -1.0;              // 扩散系数
+    int total_stepsTest = 100;           // 总时间步数（t总=1.0）
+    double dtTest = 1.0/total_stepsTest;                // 时间步长（无需满足CFL条件）
+    double boundary_tolTest = (hxTest+hyTest)*1.4;
+
+    PolyPoissonEQ polyTest(NxTest, NyTest, hxTest, hyTest, regionTest, boundary_tolTest);
+    // 3. 初始化CN求解器
+    ParabolaCN cn_solverTest(polyTest, alphaTest, dtTest, total_stepsTest);
+
+    // 4. 求解并计时
+    auto startTest = std::chrono::high_resolution_clock::now();
+    auto test_sol = cn_solverTest.solve(testInitCondition, testSourceTerm);
+    auto endTest = std::chrono::high_resolution_clock::now();
+    double timeTest = std::chrono::duration_cast<std::chrono::milliseconds>(endTest - startTest).count();
+
+    std::cout << "CN finished!" << std::endl;
+    std::cout << "Total time:" << timeTest << " ms" << std::endl;
+    std::cout << "File saved: data/Hw3_Test" << std::endl;
+
+
+
+    PolyPoissonEQ polyTrue(NxTest, NyTest, hxTest, hyTest, regionTest, boundary_tolTest);
+    ParabolaCN cn_solverTrue(polyTest, 0.0, dtTest, total_stepsTest);
+    auto true_sol = cn_solverTrue.solve([](double x, double y){return testFunc(x, y, 1.0);}, [](double x, double y, double t){return 0.0;});
+
+    vectorAdd(test_sol, -1.0, true_sol);
+    std::cout<<norm(test_sol)/NxTest/NyTest<< std::endl;*/
+
+
+    /*    // 1. 定义计算区域（多边形边界）
+    std::vector<PolygonEdge> edges = {
+        {PolygonPoint(0,0), PolygonPoint(2,0), POLY_DIRICHLET, [](double x, double y){return 1.0;}},
+        {PolygonPoint(2,0), PolygonPoint(1,1), POLY_DIRICHLET, [](double x, double y){return 1.5;}},
+        {PolygonPoint(1,1), PolygonPoint(2,3), POLY_DIRICHLET, [](double x, double y){return 0.0;}},
+        {PolygonPoint(2,3), PolygonPoint(1,4), POLY_DIRICHLET, [](double x, double y){return 0.0;}},
+        {PolygonPoint(1,4), PolygonPoint(0,3), POLY_DIRICHLET, [](double x, double y){return 0.8;}},
+        {PolygonPoint(0,3), PolygonPoint(0,0), POLY_DIRICHLET, [](double x, double y){return 0.5;}}
+    };
+    PolygonRegion region(edges);
+
+    // 2. 数值参数（CN格式无条件稳定，dt可大幅增大）
+    int Nx = 31, Ny =61;         // 网格节点数
+    double hx = 2.0 / (Nx-1), hy = 4.0 / (Ny-1);  // 空间步长（x:0-2，y:0-4）
+    double alpha = -1.0;              // 扩散系数
+    double dt = 0.001;                // 时间步长（无需满足CFL条件）
+    int total_steps = 1000;           // 总时间步数（t总=1.0）
+    double boundary_tol = (hx+hy)*1.4;
+
+    PolyPoissonEQ poly(Nx, Ny, hx, hy, region, boundary_tol);
+    // 3. 初始化CN求解器
+    ParabolaExplicit cn_solver(poly, alpha, dt, total_steps);
+
+    // 4. 求解并计时
+    auto start = std::chrono::high_resolution_clock::now();
+    cn_solver.solve(initCondition, sourceTerm, "dataEx/Hw3_Result");
+    auto end = std::chrono::high_resolution_clock::now();
+    double time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    std::cout << "CN finished!" << std::endl;
+    std::cout << "Total time:" << time << " ms" << std::endl;
+    std::cout << "File saved: dataEx/Hw3_Result" << std::endl;*/
+
+    // 1. 定义计算区域（多边形边界）
+    std::vector<PolygonEdge> edgesTest = {
+        {PolygonPoint(0,0), PolygonPoint(2,0), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(2,0), PolygonPoint(1,1), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(1,1), PolygonPoint(2,3), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(2,3), PolygonPoint(1,4), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(1,4), PolygonPoint(0,3), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(0,3), PolygonPoint(0,0), POLY_DIRICHLET, testFunc}
+    };
+    PolygonRegion regionTest(edgesTest);
+
+    // 2. 数值参数（CN格式无条件稳定，dt可大幅增大）
+    int NxTest = 26, NyTest =51;         // 网格节点数
+    double hxTest = 2.0 / (NxTest-1), hyTest = 4.0 / (NyTest-1);  // 空间步长（x:0-2，y:0-4）
+    double alphaTest = -1.0;              // 扩散系数
+    int total_stepsTest = 32000;           // 总时间步数（t总=1.0）
+    double dtTest = 1.0/total_stepsTest;                // 时间步长（无需满足CFL条件）
+    double boundary_tolTest = (hxTest+hyTest)*1.4;
+
+    PolyPoissonEQ polyTest(NxTest, NyTest, hxTest, hyTest, regionTest, boundary_tolTest);
+    // 3. 初始化CN求解器
+    ParabolaExplicit cn_solverTest(polyTest, alphaTest, dtTest, total_stepsTest);
+
+    // 4. 求解并计时
+    auto startTest = std::chrono::high_resolution_clock::now();
+    auto test_sol = cn_solverTest.solve(testInitCondition, testSourceTerm);
+    auto endTest = std::chrono::high_resolution_clock::now();
+    double timeTest = std::chrono::duration_cast<std::chrono::milliseconds>(endTest - startTest).count();
+
+    std::cout << "CN finished!" << std::endl;
+    std::cout << "Total time:" << timeTest << " ms" << std::endl;
+    std::cout << "File saved: data/Hw3Ex_Test" << std::endl;
+
+
+
+    PolyPoissonEQ polyTrue(NxTest, NyTest, hxTest, hyTest, regionTest, boundary_tolTest);
+    ParabolaExplicit cn_solverTrue(polyTest, 0.0, dtTest, total_stepsTest);
+    auto true_sol = cn_solverTrue.solve([](double x, double y){return testFunc(x, y, 1.0);}, [](double x, double y, double t){return 0.0;});
+
+    vectorAdd(test_sol, -1.0, true_sol);
+    std::cout<<norm(test_sol)/NxTest/NyTest<< std::endl;
+    return 0;
+}
+
+=============v3.3=============================
+#include "sparse_matrix.h"
+#include "PoissonEQ.h"
+#include <numeric>
+#include <chrono>
+#include <cmath>
+#include "ParabolaPDE.h"
+
+double testSolution(double x, double y){
+    return std::sin(std::numbers::pi* x)*std::cos(2.0*std::numbers::pi*y);
+}
+
+double testDirichletBC(double x, double y){
+    return std::sin(std::numbers::pi* x)*std::cos(2.0*std::numbers::pi*y);
+}
+
+double testNeumannBC_X(double x, double y){
+    return -std::numbers::pi*std::cos(std::numbers::pi* x)*std::cos(2.0*std::numbers::pi*y);
+}
+
+double testNeumannBC_Y(double x, double y){
+    return 2.0*std::numbers::pi*std::sin(std::numbers::pi* x)*std::sin(2.0*std::numbers::pi*y);
+}
+
+double testSource(double x, double y){
+    return -5.0*std::numbers::pi*std::numbers::pi*testDirichletBC(x, y);
+}
+
+int main() {
+
+    std::vector<PolygonEdge> edges = {
+        {PolygonPoint(0,0), PolygonPoint(2,0), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(2,0), PolygonPoint(1,1), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(1,1), PolygonPoint(2,3), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(2,3), PolygonPoint(1,4), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(1,4), PolygonPoint(0,3), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(0,3), PolygonPoint(0,0), POLY_DIRICHLET, testDirichletBC}
+    };
+    PolygonRegion region(edges);
+    int Nx = 81;
+    int Ny = 161;
+    double hx = 2.0/(Nx-1);
+    double hy = 4.0/(Ny-1);
+    double boundary_tol = hx;
+    PolyPoissonEQ poly(Nx, Ny, hx, hy, region, boundary_tol);
+
+    std::cout << "Dirichlet Boundary Condition Test" << std::endl;
+    std::cout << "Now Starting chrono" << std::endl;
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Make PDEMatrix..." << std::endl;
+    poly.makeMatrix();
+    auto matrix_time = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Make Constant..." << std::endl;
+    poly.makeConstant(testSource);
+    auto constant_time = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Now Solving..." << std::endl;
+    auto x_PDE = poly.SolvePDE(1e-5, 30000);
+    auto end_time = std::chrono::high_resolution_clock::now();
+
+    auto duration_matrix = std::chrono::duration_cast<std::chrono::milliseconds>(matrix_time - start_time);
+    auto duration_constant = std::chrono::duration_cast<std::chrono::milliseconds>(constant_time - matrix_time);
+    auto duration_solve = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - constant_time);
+
+    std::cout << "Execution time:\n";
+    std::cout << "Make PDEMatrix:\n";
+    std::cout << "  - " << duration_matrix.count() << " milliseconds\n";
+    std::cout << "Make Constant:\n";
+    std::cout << "  - " << duration_constant.count() << " milliseconds\n";
+    std::cout << "Make Solve:\n";
+    std::cout << "  - " << duration_solve.count() << " milliseconds\n";
+    std::cout << "Gauss-Seidel finished." << std::endl;
+    std::cout << "Gauss-Seidel iter: " << x_PDE.iteration << std::endl;
+    std::cout << "Gauss-Seidel residual: " << x_PDE.residual << std::endl;
+    write_vector_to_file("vector_data1.bin",x_PDE.solution);
+    std::cout << std::endl;
+
+    std::vector<PolygonEdge> edgesTrue = {
+        {PolygonPoint(0,0), PolygonPoint(2,0), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(2,0), PolygonPoint(1,1), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(1,1), PolygonPoint(2,3), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(2,3), PolygonPoint(1,4), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(1,4), PolygonPoint(0,3), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(0,3), PolygonPoint(0,0), POLY_DIRICHLET, testDirichletBC}
+    };
+    PolygonRegion regionTrue(edges);
+    PolyPoissonEQ polyTrue(Nx, Ny, hx, hy, region, 10);
+
+    std::cout << "Dirichlet Boundary Condition Test" << std::endl;
+    std::cout << "Now Starting chrono" << std::endl;
+    auto start_timeTrue = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Make PDEMatrix..." << std::endl;
+    polyTrue.makeMatrix();
+    auto matrix_timeTrue = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Make Constant..." << std::endl;
+    polyTrue.makeConstant(testSolution);
+    auto constant_timeTrue = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Now Solving..." << std::endl;
+    auto x_PDE_True = polyTrue.SolvePDE(1e-5, 30000);
+    auto end_timeTrue = std::chrono::high_resolution_clock::now();
+
+    auto duration_matrix_True = std::chrono::duration_cast<std::chrono::milliseconds>(matrix_timeTrue - start_timeTrue);
+    auto duration_constantTrue = std::chrono::duration_cast<std::chrono::milliseconds>(constant_timeTrue - matrix_timeTrue);
+    auto duration_solveTrue = std::chrono::duration_cast<std::chrono::milliseconds>(end_timeTrue - constant_timeTrue);
+
+    std::cout << "Execution time:\n";
+    std::cout << "Make PDEMatrix:\n";
+    std::cout << "  - " << duration_matrix_True.count() << " milliseconds\n";
+    std::cout << "Make Constant:\n";
+    std::cout << "  - " << duration_constantTrue.count() << " milliseconds\n";
+    std::cout << "Make Solve:\n";
+    std::cout << "  - " << duration_solveTrue.count() << " milliseconds\n";
+    std::cout << "Gauss-Seidel finished." << std::endl;
+    std::cout << "Gauss-Seidel iter: " << x_PDE_True.iteration << std::endl;
+    std::cout << "Gauss-Seidel residual: " << x_PDE_True.residual << std::endl;
+    write_vector_to_file("vector_data1.bin",x_PDE_True.solution);
+    std::cout << std::endl;
+
+
+    vectorAdd(x_PDE.solution, -1.0, x_PDE_True.solution);
+    std::cout<<norm(x_PDE.solution)/sqrt(Nx)/sqrt(Ny)<<std::endl;
+
+    std::vector<PolygonEdge> edges2 = {
+        {PolygonPoint(0,0), PolygonPoint(2,0), POLY_NEUMANN, [](double x, double y){return testNeumannBC_Y(x, y);}},
+        // {PolygonPoint(0,0), PolygonPoint(2,0), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(2,0), PolygonPoint(1,1), POLY_NEUMANN, [](double x, double y){return -(testNeumannBC_X(x, y)+testNeumannBC_Y(x, y))/sqrt(2);}},
+        // {PolygonPoint(2,0), PolygonPoint(1,1), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(1,1), PolygonPoint(2,3), POLY_NEUMANN, [](double x, double y){return (-2*testNeumannBC_X(x, y)+testNeumannBC_Y(x, y))/sqrt(5);}},
+        // {PolygonPoint(1,1), PolygonPoint(2,3), POLY_DIRICHLET, testDirichletBC},
+        // {PolygonPoint(2,3), PolygonPoint(1,4), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(2,3), PolygonPoint(1,4), POLY_NEUMANN, [](double x, double y){return -(testNeumannBC_X(x, y)+testNeumannBC_Y(x, y))/sqrt(2);}},
+        // {PolygonPoint(1,4), PolygonPoint(0,3), POLY_DIRICHLET, testDirichletBC},
+        {PolygonPoint(1,4), PolygonPoint(0,3), POLY_NEUMANN, [](double x, double y){return (testNeumannBC_X(x, y)-testNeumannBC_Y(x, y))/sqrt(2);}},
+        {PolygonPoint(0,3), PolygonPoint(0,0), POLY_NEUMANN, [](double x, double y){return testNeumannBC_X(x, y);}}
+        // {PolygonPoint(0,3), PolygonPoint(0,0), POLY_DIRICHLET, testDirichletBC}
+    };
+    PolygonRegion region2(edges2);
+    PolyPoissonEQ poly2(Nx, Ny, hx, hy, region2, boundary_tol);
+
+    std::cout << "Neumann Boundary Condition Test" << std::endl;
+    std::cout << "Now Starting chrono" << std::endl;
+    auto start_time2 = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Make PDEMatrix..." << std::endl;
+    poly2.makeMatrix();
+    auto matrix_time2 = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Make Constant..." << std::endl;
+    poly2.makeConstant(testSource);
+    auto constant_time2 = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Now Solving..." << std::endl;
+    auto x_PDE2 = poly2.SolvePDE(1e-5, 60000);
+    auto end_time2 = std::chrono::high_resolution_clock::now();
+
+    auto duration_matrix2 = std::chrono::duration_cast<std::chrono::milliseconds>(matrix_time2 - start_time2);
+    auto duration_constant2 = std::chrono::duration_cast<std::chrono::milliseconds>(constant_time2 - matrix_time2);
+    auto duration_solve2 = std::chrono::duration_cast<std::chrono::milliseconds>(end_time2 - constant_time2);
+
+    std::cout << "Execution time:\n";
+    std::cout << "Make PDEMatrix:\n";
+    std::cout << "  - " << duration_matrix2.count() << " milliseconds\n";
+    std::cout << "Make Constant:\n";
+    std::cout << "  - " << duration_constant2.count() << " milliseconds\n";
+    std::cout << "Make Solve:\n";
+    std::cout << "  - " << duration_solve2.count() << " milliseconds\n";
+    std::cout << "Gauss-Seidel finished." << std::endl;
+    std::cout << "Gauss-Seidel iter: " << x_PDE2.iteration << std::endl;
+    std::cout << "Gauss-Seidel residual: " << x_PDE2.residual << std::endl;
+    write_vector_to_file("vector_data2.bin",x_PDE2.solution);
+
+    double norm1 = sum(x_PDE2.solution)/Nx/Ny;
+    auto alpha = vectorIdentity(Nx*Ny, norm1);
+    vectorAdd(x_PDE2.solution, -1.0, alpha);
+    write_vector_to_file("vector_data3.bin",x_PDE2.solution);
+    vectorAdd(x_PDE2.solution, -1.0, x_PDE_True.solution);
+    write_vector_to_file("vector_data4.bin",x_PDE2.solution);
+    std::cout<<norm(x_PDE2.solution)/sqrt(Nx)/sqrt(Ny)<<std::endl;
+
+    return 0;
+}
+
+#include "sparse_matrix.h"
+#include "PoissonEQ.h"
+#include <numeric>
+#include <chrono>
+#include <cmath>
+#include "ParabolaPDE.h"
+
+double delta(double x, double y, double x0, double y0, double tol) {
+    double delX = x-x0;
+    double delY = y-y0;
+    if (delX*delX + delY*delY < tol) {
+        return 1;
+    }else {
+        return 0;
+    }
+}
+
+double initCondition(double x, double y) {
+    return 0.0;
+}
+
+double sinrr(double beta, double x) {
+    if (abs(x)<1e-5) {
+        return beta;
+    }
+    return sin(beta*x)/x;
+}
+
+double sourceTerm(double x, double y, double t) {
+    double r = sqrt(x*x + y*y);
+    return exp(-5.0*r*r)*(50*cos(2*r)*cos(50*t)-100*cos(50*r));
+}
+
+double testFunc(double x, double y, double t) {
+    return 1/(4*std::numbers::pi*(t+0.1))*exp(-((x-1)*(x-1)+(y-1)*(y-1))/(4*(t+0.1)));
+}
+
+double testInitCondition(double x, double y) {
+    return testFunc(x, y, 0.0);
+}
+
+double testSourceTerm(double x, double y, double t) {
+    return 1/(4*std::numbers::pi*(t+0.1)*(t+0.1))*delta(x,y,1.0,1.0,0.005);
+}
+
+int main() {
+    /*// 1. 定义计算区域（多边形边界）
+    std::vector<PolygonEdge> edges = {
+        {PolygonPoint(0,0), PolygonPoint(2,0), POLY_DIRICHLET, [](double x, double y){return 1.0;}},
+        {PolygonPoint(2,0), PolygonPoint(1,1), POLY_DIRICHLET, [](double x, double y){return 1.5;}},
+        {PolygonPoint(1,1), PolygonPoint(2,3), POLY_DIRICHLET, [](double x, double y){return 0.0;}},
+        {PolygonPoint(2,3), PolygonPoint(1,4), POLY_DIRICHLET, [](double x, double y){return 0.0;}},
+        {PolygonPoint(1,4), PolygonPoint(0,3), POLY_DIRICHLET, [](double x, double y){return 0.8;}},
+        {PolygonPoint(0,3), PolygonPoint(0,0), POLY_DIRICHLET, [](double x, double y){return 0.5;}}
+    };
+    PolygonRegion region(edges);
+
+    // 2. 数值参数（CN格式无条件稳定，dt可大幅增大）
+    int Nx = 101, Ny =201;         // 网格节点数
+    double hx = 2.0 / (Nx-1), hy = 4.0 / (Ny-1);  // 空间步长（x:0-2，y:0-4）
+    double alpha = -1.0;              // 扩散系数
+    double dt = 0.001;                // 时间步长（无需满足CFL条件）
+    int total_steps = 1000;           // 总时间步数（t总=1.0）
+    double boundary_tol = (hx+hy)*1.4;
+
+    PolyPoissonEQ poly(Nx, Ny, hx, hy, region, boundary_tol);
+    // 3. 初始化CN求解器
+    ParabolaCN cn_solver(poly, alpha, dt, total_steps);
+
+    // 4. 求解并计时
+    auto start = std::chrono::high_resolution_clock::now();
+    cn_solver.solve(initCondition, sourceTerm, "data/Hw3_Result");
+    auto end = std::chrono::high_resolution_clock::now();
+    double time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    std::cout << "CN finished!" << std::endl;
+    std::cout << "Total time:" << time << " ms" << std::endl;
+    std::cout << "File saved: data/Hw3_Result" << std::endl;*/
+
+    /*// 1. 定义计算区域（多边形边界）
+    std::vector<PolygonEdge> edgesTest = {
+        {PolygonPoint(0,0), PolygonPoint(2,0), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(2,0), PolygonPoint(1,1), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(1,1), PolygonPoint(2,3), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(2,3), PolygonPoint(1,4), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(1,4), PolygonPoint(0,3), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(0,3), PolygonPoint(0,0), POLY_DIRICHLET, testFunc}
+    };
+    PolygonRegion regionTest(edgesTest);
+
+    // 2. 数值参数（CN格式无条件稳定，dt可大幅增大）
+    int NxTest = 201, NyTest =401;         // 网格节点数
+    double hxTest = 2.0 / (NxTest-1), hyTest = 4.0 / (NyTest-1);  // 空间步长（x:0-2，y:0-4）
+    double alphaTest = -1.0;              // 扩散系数
+    int total_stepsTest = 100;           // 总时间步数（t总=1.0）
+    double dtTest = 1.0/total_stepsTest;                // 时间步长（无需满足CFL条件）
+    double boundary_tolTest = (hxTest+hyTest)*1.4;
+
+    PolyPoissonEQ polyTest(NxTest, NyTest, hxTest, hyTest, regionTest, boundary_tolTest);
+    // 3. 初始化CN求解器
+    ParabolaCN cn_solverTest(polyTest, alphaTest, dtTest, total_stepsTest);
+
+    // 4. 求解并计时
+    auto startTest = std::chrono::high_resolution_clock::now();
+    auto test_sol = cn_solverTest.solve(testInitCondition, testSourceTerm);
+    auto endTest = std::chrono::high_resolution_clock::now();
+    double timeTest = std::chrono::duration_cast<std::chrono::milliseconds>(endTest - startTest).count();
+
+    std::cout << "CN finished!" << std::endl;
+    std::cout << "Total time:" << timeTest << " ms" << std::endl;
+    std::cout << "File saved: data/Hw3_Test" << std::endl;
+
+
+
+    PolyPoissonEQ polyTrue(NxTest, NyTest, hxTest, hyTest, regionTest, boundary_tolTest);
+    ParabolaCN cn_solverTrue(polyTest, 0.0, dtTest, total_stepsTest);
+    auto true_sol = cn_solverTrue.solve([](double x, double y){return testFunc(x, y, 1.0);}, [](double x, double y, double t){return 0.0;});
+
+    vectorAdd(test_sol, -1.0, true_sol);
+    std::cout<<norm(test_sol)/NxTest/NyTest<< std::endl;*/
+
+
+    /*    // 1. 定义计算区域（多边形边界）
+    std::vector<PolygonEdge> edges = {
+        {PolygonPoint(0,0), PolygonPoint(2,0), POLY_DIRICHLET, [](double x, double y){return 1.0;}},
+        {PolygonPoint(2,0), PolygonPoint(1,1), POLY_DIRICHLET, [](double x, double y){return 1.5;}},
+        {PolygonPoint(1,1), PolygonPoint(2,3), POLY_DIRICHLET, [](double x, double y){return 0.0;}},
+        {PolygonPoint(2,3), PolygonPoint(1,4), POLY_DIRICHLET, [](double x, double y){return 0.0;}},
+        {PolygonPoint(1,4), PolygonPoint(0,3), POLY_DIRICHLET, [](double x, double y){return 0.8;}},
+        {PolygonPoint(0,3), PolygonPoint(0,0), POLY_DIRICHLET, [](double x, double y){return 0.5;}}
+    };
+    PolygonRegion region(edges);
+
+    // 2. 数值参数（CN格式无条件稳定，dt可大幅增大）
+    int Nx = 31, Ny =61;         // 网格节点数
+    double hx = 2.0 / (Nx-1), hy = 4.0 / (Ny-1);  // 空间步长（x:0-2，y:0-4）
+    double alpha = -1.0;              // 扩散系数
+    double dt = 0.001;                // 时间步长（无需满足CFL条件）
+    int total_steps = 1000;           // 总时间步数（t总=1.0）
+    double boundary_tol = (hx+hy)*1.4;
+
+    PolyPoissonEQ poly(Nx, Ny, hx, hy, region, boundary_tol);
+    // 3. 初始化CN求解器
+    ParabolaExplicit cn_solver(poly, alpha, dt, total_steps);
+
+    // 4. 求解并计时
+    auto start = std::chrono::high_resolution_clock::now();
+    cn_solver.solve(initCondition, sourceTerm, "dataEx/Hw3_Result");
+    auto end = std::chrono::high_resolution_clock::now();
+    double time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    std::cout << "CN finished!" << std::endl;
+    std::cout << "Total time:" << time << " ms" << std::endl;
+    std::cout << "File saved: dataEx/Hw3_Result" << std::endl;*/
+
+    // 1. 定义计算区域（多边形边界）
+    std::vector<PolygonEdge> edgesTest = {
+        {PolygonPoint(0,0), PolygonPoint(2,0), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(2,0), PolygonPoint(1,1), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(1,1), PolygonPoint(2,3), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(2,3), PolygonPoint(1,4), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(1,4), PolygonPoint(0,3), POLY_DIRICHLET, testFunc},
+        {PolygonPoint(0,3), PolygonPoint(0,0), POLY_DIRICHLET, testFunc}
+    };
+    PolygonRegion regionTest(edgesTest);
+
+    // 2. 数值参数（CN格式无条件稳定，dt可大幅增大）
+    int NxTest = 51, NyTest =101;         // 网格节点数
+    double hxTest = 2.0 / (NxTest-1), hyTest = 4.0 / (NyTest-1);  // 空间步长（x:0-2，y:0-4）
+    double alphaTest = -1.0;              // 扩散系数
+    int total_stepsTest = 160;           // 总时间步数（t总=1.0）
+    double dtTest = 1.0/total_stepsTest;                // 时间步长（无需满足CFL条件）
+    double boundary_tolTest = (hxTest+hyTest)*1.4;
+
+    PolyPoissonEQ polyTest(NxTest, NyTest, hxTest, hyTest, regionTest, boundary_tolTest);
+    // 3. 初始化CN求解器
+    ParabolaCN cn_solverTest(polyTest, alphaTest, dtTest, total_stepsTest);
+
+    // 4. 求解并计时
+    auto startTest = std::chrono::high_resolution_clock::now();
+    auto test_sol = cn_solverTest.solve(testInitCondition, testSourceTerm);
+    auto endTest = std::chrono::high_resolution_clock::now();
+    double timeTest = std::chrono::duration_cast<std::chrono::milliseconds>(endTest - startTest).count();
+
+    std::cout << "CN finished!" << std::endl;
+    std::cout << "Total time:" << timeTest << " ms" << std::endl;
+    std::cout << "File saved: data/Hw3Ex_Test" << std::endl;
+
+
+
+    PolyPoissonEQ polyTrue(NxTest, NyTest, hxTest, hyTest, regionTest, boundary_tolTest);
+    ParabolaCN cn_solverTrue(polyTest, 0.0, dtTest, total_stepsTest);
+    auto true_sol = cn_solverTrue.solve([](double x, double y){return testFunc(x, y, 1.0);}, [](double x, double y, double t){return 0.0;});
+
+    vectorAdd(test_sol, -1.0, true_sol);
+    std::cout<<norm(test_sol)/sqrt(NxTest*NyTest)<< std::endl;
+    return 0;
+}
+
+===============================v4.0====================================
+
+
