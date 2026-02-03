@@ -1,0 +1,76 @@
+\documentclass[12pt, a4paper, oneside]{article}
+\usepackage{amsmath, amsthm, amssymb, graphicx, float}
+\title{SparseMatrixSolutor v2.3 Numerical Report}
+\author{Anqi Lv\thanks{email:2200011316@stu.pku.edu.cn tel:18315391730}\\PHYS 2200011316}
+\date{2025.10.22}
+\renewcommand\thesection{\Roman{section}}
+\renewcommand\thesubsection{\roman{subsection}}
+\begin{document}
+\maketitle
+\section{Numerical Method}
+\subsection{Process}
+In this part I will explain how this program works.
+
+The program has PoissonEQ class. This class has grid and boundary condition information inside.
+
+The program firstly sets a Rectangle Reign with rectangle grid. Then it will scan each node to get whether it is inside the effective area. Node inside the area will be marked "active" while others "inactive".
+
+Solution on inactive node is set to 0 now( of course you can set it to any number). Then active nodes will construct the PDEMatrix. Each node has an equation with it. I called this equation as the "MainEQ" of this node.
+
+Active node will be classified to inner node and boundary node. Inner node's MainEQ is five-point difference scheme. Boundary node's MainEQ is just its boundary condition(Because nodes near boundary will also be considered as boundary. This step will make some truncation error. Use polynomial fitting can reduce it. I'm considering to update this method in the next version).
+
+Later when the LHS of MainEQ is constructed, RHS is then constructed. BC has been saved in PoissonEQ class. User only need to provide source function of Poisson equation.
+
+Equation is then solved by Gauss-Sider Iteration. Output is saved as .bin. You can use VisualizeMain.exe to visualize it.
+
+\subsection{Grid}
+I choose rectangle grid to discretize Poisson Eqation with x-axis interval $h_x$, y-axis interval $h_y$.
+
+\subsection{Boundary Condition}
+I calculate the distance between the node and boundary sigment. If the distance is shorter than toleration, it will be judged as Boundary Point.
+
+For Dirichlet BC node, the MainEQ is:
+\[
+    U(i_x, i_y) = g(x(i_x), y(i_y))
+\]
+
+For Neumann BC and Mixed BC node, the MainEQ is:
+\[
+    \alpha U(i_x, i_y)-\beta (n_x\cdot\frac{U_{x>}-U_{x<}}{h_x}+n_y\cdot\frac{U_{y>}-U_{y<}}{h_y})=g(x(i_x), y(i_y))
+\]
+
+\section{Numerical Test}
+I try function:
+\[
+    f(x,y)=sin(\pi x)cos(2\pi y)
+\]
+as a test function.
+
+Use grid hx=0.02, hy=0.02.
+
+Try Dirichlet BC and the solution is right:
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=8cm]{1.png}
+    \caption{Dirichlet BC Solution}
+\end{figure}
+It just takes a little time:
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=5cm]{2.png}
+    \caption{Dirichlet BC Print}
+\end{figure}
+Try Dirichlet BC and the solution is right:
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=8cm]{3.png}
+    \caption{Neumann BC Solution}
+\end{figure}
+It just takes a little time:
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=5cm]{4.png}
+    \caption{Neumann BC Test}
+\end{figure}
+
+\end{document}

@@ -1,0 +1,127 @@
+\documentclass[12pt, a4paper, oneside]{article}
+\usepackage{amsmath, amsthm, amssymb, graphicx, float}
+\title{SparseMatrixSolutor v1.2 Test Report}
+\author{Anqi Lv\thanks{email:2200011316@stu.pku.edu.cn tel:18315391730}\\PHYS 2200011316}
+\date{2025.10.6}
+\renewcommand\thesection{\Roman{section}}
+\renewcommand\thesubsection{\roman{subsection}}
+\begin{document}
+\maketitle
+\section{Sparse Matrix}
+\subsection{Construction and Print}
+Try Matrix Construction:
+
+SparseMatrix A(3, 3);
+
+A.setValue(0, 0, 1.0);
+
+A.setValue(0, 2, 2.0);
+
+A.setValue(1, 1, 3.0);
+
+A.setValue(2, 2, 5.0);
+
+A.setValue(2, 0, 4.0);
+
+Print A both in Dense and Sparse form. Output is correct.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=5cm]{test1.png}
+    \caption{Print}
+\end{figure}
+
+\subsection{Transpose}
+Try transposing the Matrix A(defined above):
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=5cm]{test2.png}
+    \caption{Transpose}
+\end{figure}
+
+Output is correct.
+
+\subsection{Cut}
+Try cutting Matrix into diagonal part, upper triangle part and lower triangle part.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=5cm]{test4.png}
+    \caption{Cut}
+\end{figure}
+
+Operation is correct.
+
+\subsection{Add and Multyply}
+Try defining Matrix B, and testing + operator and * operator.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=5cm]{test3.png}
+    \caption{Add and Multiply}
+\end{figure}
+
+Operation is correct.
+
+\section{Matrix Solver}
+I have write two method for solving matrix:
+
+Gauss-Sider Iteration is suitable for most cases,especially when the diagonal element is dominant.
+
+Conjuction Gradient is based on Krylov subspace.
+It can only be used when the matrix is positive defined and symmetric.
+
+\subsection{Correction Test}
+I test a 6*6 Matrix when the RHS is 12.0, 20.0, 30.0, 60.0, 20.0, 30.0, for each equation respectively:
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=10cm]{test5.png}
+    \caption{Correction Test}
+\end{figure}
+
+And the result is correct for each method.
+
+Noticing that Conjuction Gradient's Iteration is obviously less than Gauss-Sider,and it's residual is much less than the other one. Conjuction Gradient is recommanded for positive symmetric case.
+
+
+\subsection{Time Test}
+I test a 100000*100000 Matrix when the RHS is periodic. There are three elements in each row:
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=5cm]{test6.png}
+    \caption{Time Test}
+\end{figure}
+
+Only takes 39ms for both transposing and Gauss-Sider Iteration.
+
+\section{PDE Solver}
+\subsection{Dirichlet BC in Rectangle area}
+I solve Poisson equation as:
+\[
+    \nabla^2 u = 0
+\]
+with Boundary Condition:
+\[
+    u(x,y)=x^2-y^2 (x=0||x=1||y=0||y=1)
+\]
+I make grid with interval x,y is both 0.01,meaning that there are 100*100 nodes.
+
+The problem is solved rapidly:
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=10cm]{test7.png}
+    \caption{Solve Poisson EQ}
+\end{figure}
+
+\subsection{Visualize}
+In this part I choose Python language to Plot the result. Mention that the solution of the equation is obvious $u(x,y)=x^2-y^2$, the computing result is obviously right.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=10cm]{test8.png}
+    \caption{Visualize the Solution}
+\end{figure}
+\end{document}

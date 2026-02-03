@@ -1,0 +1,256 @@
+\documentclass[12pt, a4paper, oneside]{article}
+\usepackage{amsmath, amsthm, amssymb, graphicx, float, cases, subcaption, subfig}
+\title{SparseMatrixSolutor v3.2 Numerical Report}
+\author{Anqi Lv\thanks{email:2200011316@stu.pku.edu.cn tel:18315391730}\\PHYS 2200011316}
+\date{2025.10.22}
+\renewcommand\thesection{\Roman{section}}
+\renewcommand\thesubsection{\roman{subsection}}
+\begin{document}
+\maketitle
+\section{Numerical Method}
+\subsection{Process}
+In this part I will explain how this program works.
+
+The program is used for solving ParabolaCN and PoissonEQ. PoissonEQ has been introduced in the previous version. Now ParabolaCN is updated. It is used for solving eqations like:
+
+\begin{numcases}{} 
+    u_t+\alpha (u_{xx}+u_{yy}) = f(x,y,t)\\ 
+    u(x,y,0)=u_0(x,y)\;\;((x,y)\in \bar{\Omega} ) \\
+    u(x,y,t)=g(x,y,t)\;\;((x,y) \in \partial \Omega)
+\end{numcases}
+
+The program has PoissonEQ class and ParabolaCN class. ParabolaCN class contains PoissonEQ solver. So you should delare a PoissonEQ first, which contains net info and boundary info. Then you can declare ParabolaCN with PoissonEQ, alpha time net info.
+
+The program initialize itself by using makeMatrix and makeConst method in PoissonEQ class, in order to initialize the LHS and RHS of differential form respectively.
+
+Then to make sure the differential form is consistant with Parabola Equation, we have to operate the equation. I choose CN scheme to solve the equation:
+\[
+\frac{U^{m+1}_j}{\tau}+\frac{\alpha}{2}*\frac{U^{m+1}_{j+1}-2U^{m+1}_j+U^{m+1}_{j-1}}{h^2}=\frac{U^m_j}{\tau}-\frac{\alpha}{2}*\frac{U^m_{j+1}-2U^m_j+U^m_{j-1}}{h^2}+f^{m+1/2}_j
+\]
+
+So I use Laplace Matrix by $\frac{\alpha \tau}{2}$ and add its diagonal with 1 to construct LHS. Multiply it to $u_{previous}$ and add $u_{previous}$ itself and source term to construct RHS.
+
+The equation will then be solved by Gauss-Sider solver.
+\subsection{Grid}
+The grid method is the same as PoissonEQ. See the previous Numerical test for version 2.3 for details.
+
+\subsection{Boundary Condition}
+The ParabolaCN use the same method as in PoissonEQ, I use the number of couple term to confirm if it is a boundary term. If true, then the boundary condition will be kept.
+
+\subsection{Explicit Scheme}
+In v3.2 I add ParabolaExplicit class. It runs the same as CN scheme with a PoissonEQ to control the Boundary Condition. The only difference is that Explicit scheme use another differential scheme:
+\[
+U^{m+1}_j=U^m_j-\tau\alpha*\frac{U^m_{j+1}-2U^m_j+U^m_{j-1}}{h^2}+\tau f^m_j
+\]
+
+It is worth mention that Explicit Scheme is much more faster than CN Scheme. But it's only stable when $\frac{\tau}{h^2}\leq\frac{1}{2}$. If this condition is broken, the solution will goes infinity(even when inf not happens, the solution is also incorrect).
+
+\section{Numerical Test on CN Scheme}
+\subsection{Target Equation}
+For target equation:
+\begin{numcases}{} 
+    u_t- (u_{xx}+u_{yy}) = 100\delta (x-1,y-2.5)sin(50t)\\ 
+    u(x,y,0)=e^{-5*((x-1)^2+(y-2)^2)}\;\;((x,y)\in \bar{\Omega} )
+\end{numcases}
+Boundary condition goes like:
+
+$PolygonPoint(0,0), PolygonPoint(2,0), POLY_DIRICHLET, return 1.0$
+
+$PolygonPoint(2,0), PolygonPoint(1,1), POLY_DIRICHLET, return 1.5$
+
+$PolygonPoint(1,1), PolygonPoint(2,3), POLY_DIRICHLET, return 0.0$
+
+$PolygonPoint(2,3), PolygonPoint(1,4), POLY_DIRICHLET, return 0.0$
+
+$PolygonPoint(1,4), PolygonPoint(0,3), POLY_DIRICHLET, return 0.8$
+
+$PolygonPoint(0,3), PolygonPoint(0,0), POLY_DIRICHLET, return 0.5$
+
+Use grid hx=0.02, hy=0.02, dt=0.001, run 1s.
+
+The result is shown below:
+
+\begin{figure}[H]
+	\centering
+	\begin{minipage}{0.3\linewidth}
+		\centering
+		\includegraphics[width=0.9\linewidth]{0s.png}
+		\caption{0.00s}
+		\label{0.00s}%文中引用该图片代号
+	\end{minipage}
+	\begin{minipage}{0.3\linewidth}
+		\centering
+		\includegraphics[width=0.9\linewidth]{0.02s.png}
+		\caption{0.02s}
+		\label{0.02s}%文中引用该图片代号
+    \end{minipage}
+    \begin{minipage}{0.3\linewidth}
+		\centering
+		\includegraphics[width=0.9\linewidth]{0.04s.png}
+		\caption{0.04s}
+		\label{0.04s}
+	\end{minipage}
+	%\qquad
+	%让图片换行，
+	
+	\begin{minipage}{0.3\linewidth}
+		\centering
+		\includegraphics[width=0.9\linewidth]{0.06s.png}
+		\caption{0.06s}
+		\label{0.06s}%文中引用该图片代号
+	\end{minipage}
+	\begin{minipage}{0.3\linewidth}
+		\centering
+		\includegraphics[width=0.9\linewidth]{0.08s.png}
+		\caption{0.08s}
+		\label{0.08s}%文中引用该图片代号
+	\end{minipage}
+    \begin{minipage}{0.3\linewidth}
+		\centering
+		\includegraphics[width=0.9\linewidth]{0.1s.png}
+		\caption{0.10s}
+		\label{0.10s}
+    \end{minipage}
+\end{figure}
+
+Obviously, this Parabola Equation is about heat conduction which means the boundary temperature is fixed, a heat source shakes in sine function at (1,2.5) and the initial temperature distribution is a Gauss distribution centered at (1,2).
+
+The equation will goes as the tempreture goes stable and will have a shake region centered at (1,2.5). Based on this knowledge, the numerical solution is belivable.
+
+\subsection{Test Equation}
+We construct a Parabola Equation with a certain colsed form solution:
+
+\begin{numcases}{} 
+    u_t- (u_{xx}+u_{yy}) = e^{x+y}(cost-2sint)\\ 
+    u(x,y,0)=0\;\;((x,y)\in \bar{\Omega} )\\
+    u(x,y,t)=e^{x+y}sint\;\;((x,y) \in \partial \Omega)
+\end{numcases}
+
+Its solution is:
+\[
+    u(x,y,t)=e^{x+y}sint
+\]
+
+I compare the numerical solution and closed form solution by calculating $L^2$ Norm of their difference. $L^n$ Norm is defined below:
+\[
+||U||_{L^n}=(\frac{\sum_{i,j}^{Nx,Ny} |U_{i,j}|^p}{NxNy})^{\frac{1}{p}}
+\]
+
+When I choose hx = 0.02, hy=0.02, dt = 0.0001. The Error is 0.0033, showing extremly low error.
+
+Keep h=0.08, change dt, we get how error changes with dt:
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=8cm]{dt.png}
+    \caption{ln($error^2$) vs. ln(dt)}
+\end{figure}
+Because Gauss-Sider's tolerance is 1e-4, low error in low dt comes from Gauss-Sider residual. High part of it is about 1-power related to dt.
+
+Keep dt=0.01, change h, we get how error changes with h:
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=8cm]{h.png}
+    \caption{ln($error^2$) vs. ln(h)}
+\end{figure}
+Low part of it is about 1-power related to h.
+
+\section{Numerical Test on Explicit Scheme}
+\subsection{Target Equation}
+For the same target equation:
+\begin{numcases}{} 
+    u_t- (u_{xx}+u_{yy}) = 100\delta (x-1,y-2.5)sin(50t)\\ 
+    u(x,y,0)=e^{-5*((x-1)^2+(y-2)^2)}\;\;((x,y)\in \bar{\Omega} )
+\end{numcases}
+Boundary condition goes like:
+
+$PolygonPoint(0,0), PolygonPoint(2,0), POLY_DIRICHLET, return 1.0$
+
+$PolygonPoint(2,0), PolygonPoint(1,1), POLY_DIRICHLET, return 1.5$
+
+$PolygonPoint(1,1), PolygonPoint(2,3), POLY_DIRICHLET, return 0.0$
+
+$PolygonPoint(2,3), PolygonPoint(1,4), POLY_DIRICHLET, return 0.0$
+
+$PolygonPoint(1,4), PolygonPoint(0,3), POLY_DIRICHLET, return 0.8$
+
+$PolygonPoint(0,3), PolygonPoint(0,0), POLY_DIRICHLET, return 0.5$
+
+Because the Explicit Scheme is not stable when space interval goes definitely small, I have to sacrifice some space accuracy. Use grid hx=0.067, hy=0.067, dt=0.001s, run 1s.
+
+The result is shown below:
+
+\begin{figure}[H]
+	\centering
+	\begin{minipage}{0.3\linewidth}
+		\centering
+		\includegraphics[width=0.9\linewidth]{0sEx.png}
+		\caption{0.00s}
+		\label{0.00sEx}%文中引用该图片代号
+	\end{minipage}
+	\begin{minipage}{0.3\linewidth}
+		\centering
+		\includegraphics[width=0.9\linewidth]{0.02sEx.png}
+		\caption{0.02s}
+		\label{0.02sEx}%文中引用该图片代号
+    \end{minipage}
+    \begin{minipage}{0.3\linewidth}
+		\centering
+		\includegraphics[width=0.9\linewidth]{0.04sEx.png}
+		\caption{0.04s}
+		\label{0.04sEx}
+	\end{minipage}
+	%\qquad
+	%让图片换行，
+	
+	\begin{minipage}{0.3\linewidth}
+		\centering
+		\includegraphics[width=0.9\linewidth]{0.06sEx.png}
+		\caption{0.06s}
+		\label{0.06sEx}%文中引用该图片代号
+	\end{minipage}
+	\begin{minipage}{0.3\linewidth}
+		\centering
+		\includegraphics[width=0.9\linewidth]{0.08sEx.png}
+		\caption{0.08s}
+		\label{0.08sEx}%文中引用该图片代号
+	\end{minipage}
+    \begin{minipage}{0.3\linewidth}
+		\centering
+		\includegraphics[width=0.9\linewidth]{0.1sEx.png}
+		\caption{0.10s}
+		\label{0.10sEx}
+    \end{minipage}
+\end{figure}
+
+Comparing to the result of CN scheme, this result is belivable.
+
+\subsection{Test Equation}
+For the same test equation:
+
+\begin{numcases}{} 
+    u_t- (u_{xx}+u_{yy}) = e^{x+y}(cost-2sint)\\ 
+    u(x,y,0)=0\;\;((x,y)\in \bar{\Omega} )\\
+    u(x,y,t)=e^{x+y}sint\;\;((x,y) \in \partial \Omega)
+\end{numcases}
+
+Its solution is:
+\[
+    u(x,y,t)=e^{x+y}sint
+\]
+
+I compare the numerical solution and closed form solution by calculating $L^2$ Norm of their difference. $L^n$ Norm is defined below:
+\[
+||U||_{L^n}=(\frac{\sum_{i,j}^{Nx,Ny} |U_{i,j}|^p}{NxNy})^{\frac{1}{p}}
+\]
+
+When I choose hx = 0.02, hy=0.02, dt = 0.0001. The Error is 0.0033, showing extremly low error.
+
+Keep h=0.08, change dt, we get how error changes with dt:
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=8cm]{dtEx.png}
+    \caption{ln($error^2$) vs. ln(dt)}
+\end{figure}
+Because Explicit Scheme don't need Gauss-Sider Iteration to converge, its residual is 0. Its error seems not power related to dt.
+
+\end{document}
